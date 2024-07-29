@@ -1,4 +1,5 @@
-﻿
+﻿#TRABALHO DE INTRODUÇÃO À TEORIA DA COMPUTAÇÃO - 8110/8111
+
 class AFN:
     def __init__(self, estados, alfabeto, transicoes, estado_inicial, estados_aceitacao):
         self.estados = estados
@@ -16,20 +17,21 @@ class AFD:
         self.estados_aceitacao = estados_aceitacao
 
 
-#Conversor AFD ----> AFN
+# Conversor AFD ----> AFN
 
 def afn_para_afd(afn):
-    estado_inicial = frozenset([afn.estado_inicial])
-    estados = {estado_inicial}
-    transicoes = {}
-    estados_aceitacao = set()
-    fila = [estado_inicial]
+    estado_inicial = frozenset([afn.estado_inicial])  # Estado inicial como frozenset para garantir imutabilidade
+    estados = {estado_inicial}  # Conjunto de estados do AFD, iniciado com o estado inicial
+    transicoes = {}  # Dicionário para armazenar as transições do AFD
+    estados_aceitacao = set()  # Conjunto de estados de aceitação do AFD
+    fila = [estado_inicial]  # Fila para processar estados
 
     while fila:
-        atual = fila.pop(0)
-        transicoes[atual] = {}
+        atual = fila.pop(0)  # Estado atual a ser processado
+        transicoes[atual] = {}  # Inicializa as transições para o estado atual
 
         for simbolo in afn.alfabeto:
+            # Calcula o próximo estado para cada símbolo do alfabeto
             proximo_estado = frozenset(
                 estado for subestado in atual 
                 for estado in afn.transicoes.get(subestado, {}).get(simbolo, set())
@@ -38,38 +40,39 @@ def afn_para_afd(afn):
             if not proximo_estado:
                 continue
 
+            # Adiciona a transição para o estado atual
             transicoes[atual][simbolo] = proximo_estado
             if proximo_estado not in estados:
-                estados.add(proximo_estado)
-                fila.append(proximo_estado)
+                estados.add(proximo_estado)  # Adiciona novo estado à lista de estados
+                fila.append(proximo_estado)  # Adiciona estado à fila para processamento futuro
             if proximo_estado & afn.estados_aceitacao:
-                estados_aceitacao.add(proximo_estado)
+                estados_aceitacao.add(proximo_estado)  # Adiciona estado à aceitação se for um estado de aceitação
 
     return AFD(estados, afn.alfabeto, transicoes, estado_inicial, estados_aceitacao)
         
 
-#Simulador 
+# Simulador 
 
 def simular_afd(afd, palavra):
-    estado_atual = afd.estado_inicial
+    estado_atual = afd.estado_inicial  # Estado inicial do AFD
     for simbolo in palavra:
         if simbolo in afd.transicoes[estado_atual]:
-            estado_atual = afd.transicoes[estado_atual][simbolo]
+            estado_atual = afd.transicoes[estado_atual][simbolo]  # Transição para o próximo estado
         else:
-            return False
-    return estado_atual in afd.estados_aceitacao
+            return False  # Retorna falso se o símbolo não é encontrado na transição
+    return estado_atual in afd.estados_aceitacao  # Verifica se o estado final é de aceitação
 
 def simular_afn(afn, palavra):
-    estados_atuais = {afn.estado_inicial}
+    estados_atuais = {afn.estado_inicial}  # Conjunto de estados atuais, iniciado com o estado inicial
     for simbolo in palavra:
-        proximos_estados = set()
+        proximos_estados = set()  # Conjunto de próximos estados
         for estado in estados_atuais:
-            proximos_estados.update(afn.transicoes.get(estado, {}).get(simbolo, set()))
+            proximos_estados.update(afn.transicoes.get(estado, {}).get(simbolo, set()))  # Atualiza próximos estados
         estados_atuais = proximos_estados
-    return bool(estados_atuais & afn.estados_aceitacao)
+    return bool(estados_atuais & afn.estados_aceitacao)  # Verifica se algum dos estados atuais é de aceitação
 
 
-#Equivalência
+# Equivalência
 
 def testar_equivalencia(afn, afd):
     """
@@ -87,7 +90,7 @@ def testar_equivalencia(afn, afd):
             afn_aceita = simular_afn(afn, palavra)
             afd_aceita = simular_afd(afd, palavra)
             if afn_aceita != afd_aceita:
-                erros.append((palavra, afn_aceita, afd_aceita))
+                erros.append((palavra, afn_aceita, afd_aceita))  # Adiciona erro se a aceitação não coincidir
         return erros
 
     erros = testar_palavras()
@@ -99,13 +102,17 @@ def testar_equivalencia(afn, afd):
             print(f"Palavra: {palavra} - AFN: {'Aceita' if afn_aceita else 'Não aceita'}, AFD: {'Aceita' if afd_aceita else 'Não aceita'}")
 
 
-#Minimização
+# Minimização
 
 def minimizar_afd(afd):
+    # Inicia a partição com estados de aceitação e não aceitação
     particao = [afd.estados_aceitacao, afd.estados - afd.estados_aceitacao]
     nova_particao = []
 
     def encontrar_bloco(estado, particao):
+        """
+        Encontra o bloco da partição ao qual um estado pertence.
+        """
         for bloco in particao:
             if estado in bloco:
                 return bloco
@@ -116,19 +123,22 @@ def minimizar_afd(afd):
         for bloco in particao:
             blocos_divididos = {}
             for estado in bloco:
+                # Cria uma chave para o estado baseada nos blocos de transição
                 chave = tuple(
                     frozenset(encontrar_bloco(afd.transicoes[estado][simbolo], particao)) 
                     for simbolo in afd.alfabeto if simbolo in afd.transicoes[estado]
                 )
                 if chave not in blocos_divididos:
                     blocos_divididos[chave] = set()
-                blocos_divididos[chave].add(estado)
-            nova_particao.extend(blocos_divididos.values())
+                blocos_divididos[chave].add(estado)  # Adiciona estado ao bloco correspondente
+            nova_particao.extend(blocos_divididos.values())  # Atualiza a nova partição
         
+        # Se a partição não muda, o processo de minimização está completo
         if nova_particao == particao:
             break
         particao = nova_particao
 
+    # Cria novos estados a partir dos blocos de partição
     novos_estados = {frozenset(bloco): f'S{indice}' for indice, bloco in enumerate(particao)}
     novo_estado_inicial = next(estado for bloco, estado in novos_estados.items() if afd.estado_inicial in bloco)
     novos_estados_aceitacao = {estado for bloco, estado in novos_estados.items() if bloco & afd.estados_aceitacao}
@@ -143,7 +153,7 @@ def minimizar_afd(afd):
     return AFD(set(novos_estados.values()), afd.alfabeto, novas_transicoes, novo_estado_inicial, novos_estados_aceitacao)
 
 
-#FrontEnd
+# FrontEnd
 
 def main():
     # Entrada de dados do AFN
@@ -196,3 +206,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
